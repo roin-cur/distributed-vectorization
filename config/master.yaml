@@ -1,0 +1,70 @@
+# 分布式向量化系统 - 主节点配置
+
+# 服务配置
+service:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+
+# Kafka配置
+kafka:
+  bootstrap_servers: "kafka:29092"
+  topics:
+    tasks: "vectorization-tasks"
+    results: "task-results"
+    status: "task-status"
+  producer:
+    acks: "all"
+    retries: 3
+    batch_size: 16384
+    linger_ms: 5
+    compression_type: "snappy"
+
+# Weaviate配置
+weaviate:
+  url: "http://weaviate:8080"
+  timeout: 30
+
+# Redis配置
+redis:
+  url: "redis://redis:6379/0"
+  timeout: 10
+  max_connections: 20
+
+# 任务配置
+tasks:
+  max_retry: 3
+  timeout: 3600
+  default_batch_size: 32
+  max_batch_size: 512
+  max_concurrent: 1000
+  queue_size: 10000
+
+# 模型配置
+models:
+  default: "sentence-transformers/all-MiniLM-L6-v2"
+  supported:
+    - "sentence-transformers/all-MiniLM-L6-v2"
+    - "sentence-transformers/all-mpnet-base-v2"
+    - "sentence-transformers/distilbert-base-nli-stsb-mean-tokens"
+    - "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+
+# 监控配置
+monitoring:
+  metrics_enabled: true
+  metrics_port: 9090
+  health_check_interval: 30
+
+# 日志配置
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# 安全配置
+security:
+  cors_origins: ["*"]
+  rate_limit_requests: 100
+
+# 缓存配置
+cache:
+  result_ttl: 3600

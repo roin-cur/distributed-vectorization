@@ -1,0 +1,25 @@
+# 开发依赖
+-r requirements.txt
+
+# 测试框架
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+
+# 代码质量
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+mypy==1.7.1
+
+# 文档生成
+mkdocs==1.5.3
+mkdocs-material==9.4.8
+
+# 性能测试
+locust==2.17.0
+
+# 调试工具
+ipdb==0.13.13
+memory-profiler==0.61.0

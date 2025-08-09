@@ -1,0 +1,94 @@
+# 分布式向量化系统 - 工作节点配置
+
+# 基础配置
+worker:
+  id: "worker-1"
+  name: "Vectorization Worker"
+
+# Kafka配置
+kafka:
+  bootstrap_servers: "kafka:29092"
+  group_id: "vectorization-workers"
+  topics:
+    tasks: "vectorization-tasks"
+    results: "task-results"
+    status: "task-status"
+  consumer:
+    timeout: 1.0
+    max_poll_interval: 300000
+
+# 模型配置
+models:
+  cache_dir: "./models"
+  max_loaded: 3
+  default: "sentence-transformers/all-MiniLM-L6-v2"
+  
+  # Sentence Transformer模型
+  sentence_transformers:
+    - "sentence-transformers/all-MiniLM-L6-v2"
+    - "sentence-transformers/all-mpnet-base-v2"
+    - "sentence-transformers/distilbert-base-nli-stsb-mean-tokens"
+    - "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+  
+  # Hugging Face模型
+  huggingface:
+    - "bert-base-uncased"
+    - "distilbert-base-uncased"
+    - "roberta-base"
+  
+  # CLIP模型
+  clip:
+    - "ViT-B/32"
+    - "ViT-B/16"
+    - "ViT-L/14"
+
+# 设备配置
+device:
+  type: "auto"  # auto, cpu, cuda, mps
+  gpu_memory_limit: null  # GB
+
+# 处理配置
+processing:
+  max_batch_size: 32
+  default_batch_size: 16
+  max_text_length: 512
+  document_chunk_size: 1000
+  max_concurrent_tasks: 5
+  task_timeout: 1800
+
+# 向量数据库配置
+vector_databases:
+  default: "weaviate"
+  
+  weaviate:
+    url: "http://weaviate:8080"
+    api_key: null
+    timeout: 30
+    collection: "VectorizationResults"
+  
+  qdrant:
+    url: "localhost"
+    port: 6333
+    api_key: null
+    collection: "vectorization_results"
+
+# Redis配置
+redis:
+  url: "redis://redis:6379/0"
+  timeout: 10
+
+# 监控配置
+monitoring:
+  enable_metrics: true
+  metrics_port: 9091
+  heartbeat_interval: 30
+
+# 日志配置
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: null
+
+# 性能配置
+performance:
+  memory_limit_mb: null

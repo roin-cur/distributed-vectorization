@@ -1,0 +1,56 @@
+# Web框架
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# Kafka
+kafka-python==2.0.2
+confluent-kafka==2.3.0
+
+# 向量数据库
+weaviate-client==3.25.3
+qdrant-client==1.7.0
+chromadb==0.4.18
+
+# Redis
+redis==5.0.1
+
+# HTTP客户端
+httpx==0.25.2
+aiohttp==3.9.1
+
+# 机器学习和向量化
+torch>=2.0.0
+torchvision>=0.15.0
+sentence-transformers==2.2.2
+transformers==4.36.0
+tokenizers==0.15.0
+huggingface-hub==0.19.4
+
+# CLIP模型
+clip-by-openai==1.0
+ftfy==6.1.1
+regex==2023.10.3
+
+# 图像处理
+Pillow==10.1.0
+opencv-python==4.8.1.78
+
+# 数据处理
+numpy==1.24.3
+pandas==2.1.4
+scipy==1.11.4
+
+# 系统监控
+psutil==5.9.6
+
+# 日志和监控
+structlog==23.2.0
+prometheus-client==0.19.0
+
+# 配置管理
+python-dotenv==1.0.0
+pyyaml==6.0.1
+
+# 异步支持
+asyncio-mqtt==0.16.1

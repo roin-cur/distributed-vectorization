@@ -1,0 +1,226 @@
+version: '3.8'
+
+services:
+  # Kafka生态系统
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-logs:/var/lib/zookeeper/log
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    hostname: kafka
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9997:9997"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JMX_PORT: 9997
+      KAFKA_JMX_OPTS: -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=kafka -Dcom.sun.management.jmxremote.rmi.port=9997
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+
+  # Weaviate向量数据库
+  weaviate:
+    command:
+      - --host
+      - 0.0.0.0
+      - --port
+      - '8080'
+      - --scheme
+      - http
+    image: semitechnologies/weaviate:1.22.4
+    ports:
+      - "8080:8080"
+    restart: on-failure:0
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      ENABLE_MODULES: 'text2vec-transformers,text2vec-openai,generative-openai,ref2vec-centroid'
+      CLUSTER_HOSTNAME: 'node1'
+    volumes:
+      - weaviate-data:/var/lib/weaviate
+
+  # Redis (可选，用于缓存)
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+
+  # 主节点服务
+  master:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.master
+    container_name: vectorize-master
+    ports:
+      - "8000:8000"
+      - "9090:9090"  # Prometheus metrics
+    depends_on:
+      - kafka
+      - weaviate
+      - redis
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - WEAVIATE_URL=http://weaviate:8080
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_LEVEL=INFO
+    volumes:
+      - ../config:/app/config:ro
+      - master-logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 工作节点服务 (可扩展)
+  worker-1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    container_name: vectorize-worker-1
+    depends_on:
+      - kafka
+      - weaviate
+      - redis
+    environment:
+      - VECTORIZE_WORKER_WORKER_ID=worker-1
+      - VECTORIZE_WORKER_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - VECTORIZE_WORKER_WEAVIATE_URL=http://weaviate:8080
+      - VECTORIZE_WORKER_REDIS_URL=redis://redis:6379/0
+      - VECTORIZE_WORKER_LOG_LEVEL=INFO
+      - VECTORIZE_WORKER_DEVICE=auto
+      - VECTORIZE_WORKER_MAX_CONCURRENT_TASKS=3
+      - VECTORIZE_WORKER_MAX_LOADED_MODELS=2
+      - VECTORIZE_WORKER_MODELS_CACHE_DIR=/app/models
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ../config:/app/config:ro
+      - worker-logs:/app/logs
+      - models-cache:/app/models
+    restart: unless-stopped
+    # 如果有GPU支持，取消注释以下行
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  worker-2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    container_name: vectorize-worker-2
+    depends_on:
+      - kafka
+      - weaviate
+      - redis
+    environment:
+      - VECTORIZE_WORKER_WORKER_ID=worker-2
+      - VECTORIZE_WORKER_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - VECTORIZE_WORKER_WEAVIATE_URL=http://weaviate:8080
+      - VECTORIZE_WORKER_REDIS_URL=redis://redis:6379/0
+      - VECTORIZE_WORKER_LOG_LEVEL=INFO
+      - VECTORIZE_WORKER_DEVICE=auto
+      - VECTORIZE_WORKER_MAX_CONCURRENT_TASKS=3
+      - VECTORIZE_WORKER_MAX_LOADED_MODELS=2
+      - VECTORIZE_WORKER_MODELS_CACHE_DIR=/app/models
+      - CUDA_VISIBLE_DEVICES=1
+    volumes:
+      - ../config:/app/config:ro
+      - worker-logs:/app/logs
+      - models-cache:/app/models
+    restart: unless-stopped
+
+  # Kafka UI (开发环境)
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8081:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:29092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+    profiles:
+      - dev
+
+  # Prometheus (监控)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    profiles:
+      - monitoring
+
+  # Grafana (可视化)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    profiles:
+      - monitoring
+
+volumes:
+  zookeeper-data:
+  zookeeper-logs:
+  kafka-data:
+  weaviate-data:
+  redis-data:
+  master-logs:
+  worker-logs:
+  models-cache:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  default:
+    name: vectorize-network
